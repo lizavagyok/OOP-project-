@@ -96,7 +96,7 @@ def build_demo_network() -> TransportNetwork:
 
 
 def print_trip_result(network: TransportNetwork, passenger: Passenger) -> None:
-    can_go, path, reason = network.can_travel(passenger)
+    can_go, path, detailed_path, reason = network.can_travel(passenger)
 
     print(f"Passenger: {passenger.start_station} -> {passenger.end_station}")
     print(f"Needs: {[need.name for need in passenger.accessibility_needs]}")
@@ -104,6 +104,10 @@ def print_trip_result(network: TransportNetwork, passenger: Passenger) -> None:
     if can_go:
         print("Result: Trip is possible")
         print(f"Path: {' -> '.join(path)}")
+        if detailed_path:
+            print("Detailed steps:")
+            for step in detailed_path:
+                print(f"  {step}")
     else:
         print("Result: Trip is not possible")
 
