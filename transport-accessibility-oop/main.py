@@ -40,6 +40,24 @@ def build_demo_network() -> TransportNetwork:
             AccessibilityNeed.VISUAL_SIGNAGE,
         },
     )
+    riverside = Station(
+        name="Riverside",
+        accessibility_traits={
+            AccessibilityNeed.WHEELCHAIR_ACCESS,
+            AccessibilityNeed.ELEVATOR,
+            AccessibilityNeed.AUDIO_ANNOUNCEMENTS,
+            AccessibilityNeed.VISUAL_SIGNAGE,
+        },
+    )
+    airport = Station(
+        name="Airport",
+        accessibility_traits={
+            AccessibilityNeed.WHEELCHAIR_ACCESS,
+            AccessibilityNeed.ELEVATOR,
+            AccessibilityNeed.AUDIO_ANNOUNCEMENTS,
+            AccessibilityNeed.VISUAL_SIGNAGE,
+        },
+    )
 
     tram = Vehicle(
         vehicle_type="Tram",
@@ -88,10 +106,24 @@ def build_demo_network() -> TransportNetwork:
             AccessibilityNeed.VISUAL_SIGNAGE,
         },
     )
+    red_line = Line(
+        name="Red Line",
+        vehicle=metro,
+        stations=[harbor, riverside, airport],
+        accessibility_traits={
+            AccessibilityNeed.WHEELCHAIR_ACCESS,
+            AccessibilityNeed.ELEVATOR,
+            AccessibilityNeed.AUDIO_ANNOUNCEMENTS,
+            AccessibilityNeed.VISUAL_SIGNAGE,
+        },
+    )
 
     return TransportNetwork(
-        stations={station.name: station for station in [central, park, museum, harbor]},
-        lines=[green_line, blue_line],
+        stations={
+            station.name: station
+            for station in [central, park, museum, harbor, riverside, airport]
+        },
+        lines=[green_line, blue_line, red_line],
     )
 
 
@@ -192,6 +224,18 @@ def main() -> None:
         start_station="Central",
         end_station="Museum",
     )
+
+    # Travels Central -> Harbor -> Riverside -> Airport (3 stops, 2 line segments)
+    passenger_4 = Passenger(
+        accessibility_needs={
+            AccessibilityNeed.WHEELCHAIR_ACCESS,
+            AccessibilityNeed.ELEVATOR,
+            AccessibilityNeed.AUDIO_ANNOUNCEMENTS,
+        },
+        start_station="Central",
+        end_station="Airport",
+    )
+
     passenger_3 = Passenger(
         accessibility_needs={
             AccessibilityNeed.WHEELCHAIR_ACCESS,
@@ -202,6 +246,7 @@ def main() -> None:
 
     print_trip_result(network, passenger_1)
     print_trip_result(network, passenger_2)
+    print_trip_result(network, passenger_4)
     print_trip_result(transfer_failure_network, passenger_3)
 
 
