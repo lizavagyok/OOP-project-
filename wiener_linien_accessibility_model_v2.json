@@ -1,0 +1,850 @@
+{
+  "_meta": {
+    "title": "Wiener Linien Accessibility Model Dataset v2",
+    "description": "Three-layer accessibility dataset: (1) per-station physical traits by stop_type, (2) per-vehicle-type traits for Vehicle class, (3) line-to-vehicle-type assignments with wait-factor model. Cross-validated against wienerlinien-ogd-haltestellen.csv, wienerlinien-ogd-linien.csv, and wienerlinien-ogd-steige.csv.",
+    "sources": [
+      "https://www.wienerlinien.at/barrierefreiheit",
+      "https://www.wienerlinien.at/web/wl-en/accessible-mobility",
+      "https://www.wienerlinien.at/barrierefreiheit/stationen-mit-mittelbahnsteig",
+      "https://www.wienerlinien.at/documents/2424499/7691181/Folder_Barrierefrei_2023.pdf",
+      "https://www.wien.gv.at/verkehr/oeffentlich/barrierefreiheit.html",
+      "https://www.wien.info/en/travel-info/accessible-vienna/accessible-public-transport-338230",
+      "https://de.wikipedia.org/wiki/Straßenbahn_Wien_Type_E",
+      "https://de.wikipedia.org/wiki/Ultra_Low_Floor",
+      "https://de.wikipedia.org/wiki/U-Bahn_Wien_X",
+      "https://de.wikipedia.org/wiki/Straßenbahn_Wien_Type_D_(2017)",
+      "wienerlinien-ogd-haltestellen.csv (1959 stops)",
+      "wienerlinien-ogd-linien.csv (197 lines)",
+      "wienerlinien-ogd-steige.csv (7362 platforms)"
+    ],
+    "last_updated": "2026-03-22",
+    "data_vintage": "Late 2025 / early 2026 estimates",
+    "version": 2,
+    "changelog_v2": [
+      "Fixed 'Kaisermühlen VIC' -> 'Kaisermühlen-VIC' to match CSV naming",
+      "Fixed 'Südtiroler Platz Hauptbahnhof' -> 'Hauptbahnhof' to match CSV naming",
+      "Removed phantom tram line 27 (not present in OGD CSV data)",
+      "Replaced probability_accessible with three-field wait-factor model: line_accessible, guaranteed_accessible_vehicle, expected_wait_factor",
+      "Cross-validated all 28 tram lines, 5 U-Bahn lines, 112 bus lines against CSV"
+    ],
+    "notes": [
+      "No official structured accessibility dataset exists from Wiener Linien.",
+      "OGD CSV files contain NO accessibility columns whatsoever.",
+      "GTFS stops.txt has NO wheelchair_boarding column.",
+      "Station-level data uses blanket rules by stop_type since per-station features are uniform within categories.",
+      "The haltestellen.csv TYP field is 'stop' for all 1959 rows — stop_type must be inferred by joining through steige.csv to linien.csv VERKEHRSMITTEL."
+    ],
+    "wait_factor_model": {
+      "description": "For lines with mixed accessible/inaccessible vehicles, expected_wait_factor models the average number of headways a wheelchair user must wait. Formula: expected_wait_factor = 1.0 / fraction_accessible_vehicles. Actual extra wait = (expected_wait_factor - 1.0) * base_headway_minutes. A value of 1.0 means every vehicle is accessible (no extra wait).",
+      "example": "U1 at peak runs every 4 min. With wait_factor=1.43, expected wait is 1.43 * 4 = 5.7 min instead of 4 min. Extra wait = 1.7 min."
+    }
+  },
+
+
+  "station_traits": {
+    "_description": "Physical accessibility features at stops/stations. Since the OGD CSVs contain no accessibility columns, traits are defined by stop_type. Join stops to stop_type by: steige.csv FK_LINIEN_ID -> linien.csv VERKEHRSMITTEL. ptMetro='ubahn_station', ptTram='tram_stop', ptBusCity/ptBusNight='bus_stop'. Exceptions listed explicitly.",
+
+    "stop_type_defaults": {
+
+      "ubahn_station": {
+        "stop_type": "ubahn_station",
+        "csv_verkehrsmittel": "ptMetro",
+        "station_count": 98,
+        "elevator": true,
+        "elevator_count_total": 291,
+        "elevator_stations_total": 109,
+        "ramp_access": true,
+        "tactile_guidance_strips": true,
+        "tactile_strip_type": "raised_lines_parallel_to_platform_edge",
+        "color_guidance_system": true,
+        "visual_signage": true,
+        "visual_signage_high_contrast": true,
+        "piktogramme_international": true,
+        "electronic_departure_displays": true,
+        "departure_display_shows_accessible_train": true,
+        "accessible_train_indicator": "underscore_next_to_minutes",
+        "audio_announcements_platform": true,
+        "emergency_call_system": true,
+        "emergency_call_barrier_free": true,
+        "liftboy_app_compatible": true,
+        "ticket_machine": true,
+        "ticket_machine_low_height": true,
+        "ticket_machine_low_height_note": "Every second machine mounted at lower height",
+        "accessible_wc": "some_stations",
+        "accessible_wc_requires_eurokey": true,
+        "platform_screen_doors": false,
+        "platform_screen_doors_exceptions": ["Karlsplatz (U2)", "Museumsquartier (U2)", "Volkstheater (U2)", "Rathaus (U2)"],
+        "step_free_access_to_platform": true,
+        "shelter": true,
+        "seating": true,
+        "realtime_elevator_status_url": "https://www.wienerlinien.at/aufzugsinfo"
+      },
+
+      "tram_stop": {
+        "stop_type": "tram_stop",
+        "csv_verkehrsmittel": "ptTram",
+        "stop_count": 392,
+        "elevator": false,
+        "ramp_access": "varies",
+        "ramp_access_note": "Many stops have raised platforms (Haltestelleninseln) for level boarding with low-floor trams",
+        "tactile_guidance_strips": "some_newer_stops",
+        "color_guidance_system": false,
+        "visual_signage": true,
+        "electronic_departure_displays": "many",
+        "departure_display_shows_accessible_vehicle": true,
+        "accessible_vehicle_indicator": "wheelchair_symbol_next_to_line_number",
+        "audio_announcements_platform": false,
+        "emergency_call_system": false,
+        "liftboy_app_compatible": false,
+        "ticket_machine": "some",
+        "accessible_wc": false,
+        "platform_raised": "most",
+        "step_free_access_to_platform": "most",
+        "shelter": "most",
+        "seating": "most"
+      },
+
+      "tram_stop_underground": {
+        "stop_type": "tram_stop_underground",
+        "description": "Underground tram stations (UStrab), e.g. along the Zweierlinie",
+        "elevator": true,
+        "ramp_access": true,
+        "tactile_guidance_strips": true,
+        "visual_signage": true,
+        "electronic_departure_displays": true,
+        "departure_display_shows_accessible_vehicle": true,
+        "audio_announcements_platform": true,
+        "step_free_access_to_platform": true,
+        "realtime_elevator_status": true,
+        "shelter": true,
+        "seating": true
+      },
+
+      "bus_stop": {
+        "stop_type": "bus_stop",
+        "csv_verkehrsmittel": ["ptBusCity", "ptBusNight"],
+        "stop_count": 1555,
+        "elevator": false,
+        "ramp_access": false,
+        "ramp_access_note": "Bus kneeling + driver-deployed ramp replaces fixed infrastructure",
+        "tactile_guidance_strips": "rare",
+        "visual_signage": true,
+        "electronic_departure_displays": "some",
+        "departure_display_shows_accessible_vehicle": false,
+        "departure_display_note": "All buses are low-floor so no indicator needed",
+        "audio_announcements_platform": false,
+        "emergency_call_system": false,
+        "liftboy_app_compatible": false,
+        "ticket_machine": false,
+        "accessible_wc": false,
+        "step_free_access_to_platform": "most",
+        "step_free_note": "Boarding relies on bus kneeling + ramp, not stop infrastructure",
+        "shelter": "many",
+        "seating": "some"
+      }
+    },
+
+    "ubahn_stations_with_accessible_wc": {
+      "_note": "Station names match wienerlinien-ogd-haltestellen.csv NAME field exactly. EuroKey required.",
+      "U1": [
+        {"station": "Leopoldau", "wc_type": "modular"},
+        {"station": "Kagraner Platz", "wc_type": "modular"},
+        {"station": "Kaisermühlen-VIC", "wc_type": "modular"},
+        {"station": "Praterstern", "wc_type": "attended"},
+        {"station": "Schwedenplatz", "wc_type": "attended"},
+        {"station": "Stephansplatz", "wc_type": "attended"},
+        {"station": "Karlsplatz", "wc_type": "attended"},
+        {"station": "Hauptbahnhof", "wc_type": "modular"},
+        {"station": "Altes Landgut", "wc_type": "modular"}
+      ],
+      "U2": [
+        {"station": "Seestadt", "wc_type": "modular"},
+        {"station": "Donauspital", "wc_type": "modular"},
+        {"station": "Stadlau", "wc_type": "modular"},
+        {"station": "Stadion", "wc_type": "modular"},
+        {"station": "Praterstern", "wc_type": "attended"},
+        {"station": "Schottenring", "wc_type": "modular"},
+        {"station": "Schottentor", "wc_type": "attended"},
+        {"station": "Volkstheater", "wc_type": "attended"},
+        {"station": "Karlsplatz", "wc_type": "attended"}
+      ],
+      "U3": [
+        {"station": "Simmering", "wc_type": "modular"},
+        {"station": "Erdberg", "wc_type": "modular"},
+        {"station": "Stephansplatz", "wc_type": "attended"},
+        {"station": "Herrengasse", "wc_type": "modular"},
+        {"station": "Volkstheater", "wc_type": "attended"},
+        {"station": "Neubaugasse", "wc_type": "modular"},
+        {"station": "Westbahnhof", "wc_type": "attended"},
+        {"station": "Hütteldorfer Straße", "wc_type": "modular"},
+        {"station": "Ottakring", "wc_type": "modular"}
+      ],
+      "U4": [
+        {"station": "Heiligenstadt", "wc_type": "modular"},
+        {"station": "Spittelau", "wc_type": "modular"},
+        {"station": "Schottenring", "wc_type": "modular"},
+        {"station": "Schwedenplatz", "wc_type": "attended"},
+        {"station": "Karlsplatz", "wc_type": "attended"},
+        {"station": "Meidling Hauptstraße", "wc_type": "modular"},
+        {"station": "Hietzing", "wc_type": "modular"},
+        {"station": "Hütteldorf", "wc_type": "modular"}
+      ],
+      "U6": [
+        {"station": "Siebenhirten", "wc_type": "modular"},
+        {"station": "Alterlaa", "wc_type": "modular"},
+        {"station": "Handelskai", "wc_type": "modular"},
+        {"station": "Floridsdorf", "wc_type": "modular"}
+      ]
+    },
+
+    "construction_restrictions": {
+      "Pilgramgasse": {
+        "line": "U4",
+        "issue": "limited_barrier_free_access",
+        "reason": "U2xU5 construction",
+        "mitigation": "Free transport service for mobility-impaired passengers",
+        "booking_url": "https://www.wienerlinien.at/web/wl-en/accessible-mobility/free-transport-service-for-people-with-limited-mobility"
+      }
+    }
+  },
+
+
+  "vehicle_type_traits": {
+    "_description": "Flat per-vehicle-type accessibility traits for Vehicle class mapping. Each key is a vehicle_type_id referenced in line_vehicle_assignments.",
+
+    "silberpfeil_u": {
+      "vehicle_type_id": "silberpfeil_u",
+      "display_name": "Silberpfeil (Type U/U1/U11/U2)",
+      "mode": "ubahn",
+      "manufacturer": "Simmering-Graz-Pauker",
+      "in_service_since": 1972,
+      "status": "being_phased_out",
+      "low_floor": false,
+      "step_free_boarding": false,
+      "ramp_available": false,
+      "ramp_type": null,
+      "ramp_locations": [],
+      "ramp_automatic": false,
+      "kneeling_function": false,
+      "platform_gap_bridging": false,
+      "entry_height_mm": null,
+      "wheelchair_accessible": false,
+      "wheelchair_spaces": 0,
+      "wheelchair_space_locations": [],
+      "max_wheelchair_weight_kg": null,
+      "max_wheelchair_length_mm": null,
+      "priority_seating": true,
+      "priority_seating_marked": false,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": false,
+      "air_conditioned": false,
+      "walk_through_train": false,
+      "capacity_total": null,
+      "seats": null,
+      "length_m": null
+    },
+
+    "v_wagen": {
+      "vehicle_type_id": "v_wagen",
+      "display_name": "V-Wagen (Type V)",
+      "mode": "ubahn",
+      "manufacturer": "Siemens",
+      "in_service_since": 2000,
+      "status": "active",
+      "low_floor": false,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "folding_ramp",
+      "ramp_locations": ["first_door", "last_door"],
+      "ramp_automatic": true,
+      "kneeling_function": false,
+      "platform_gap_bridging": true,
+      "entry_height_mm": null,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 2,
+      "wheelchair_space_locations": ["front", "rear"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": false,
+      "air_conditioned": true,
+      "walk_through_train": true,
+      "capacity_total": null,
+      "seats": 260,
+      "length_m": null
+    },
+
+    "x_wagen": {
+      "vehicle_type_id": "x_wagen",
+      "display_name": "X-Wagen (Type X)",
+      "mode": "ubahn",
+      "manufacturer": "Siemens Mobility",
+      "in_service_since": 2023,
+      "status": "active_deliveries_ongoing",
+      "low_floor": false,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "folding_ramp",
+      "ramp_locations": ["all_doors"],
+      "ramp_automatic": true,
+      "kneeling_function": false,
+      "platform_gap_bridging": true,
+      "entry_height_mm": null,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 6,
+      "wheelchair_space_locations": ["front", "middle", "rear"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "priority_seating_color": "blue",
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": true,
+      "interior_screen_info": ["next_stop", "transfers", "departure_times"],
+      "air_conditioned": true,
+      "walk_through_train": true,
+      "capacity_total": 928,
+      "seats": 200,
+      "length_m": 111
+    },
+
+    "t_t1_u6": {
+      "vehicle_type_id": "t_t1_u6",
+      "display_name": "Type T/T1 (U6)",
+      "mode": "ubahn",
+      "manufacturer": "Bombardier",
+      "in_service_since": 1993,
+      "status": "active",
+      "low_floor": false,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "fixed_ramp",
+      "ramp_locations": ["all_doors"],
+      "ramp_automatic": false,
+      "ramp_permanently_deployed": true,
+      "kneeling_function": false,
+      "platform_gap_bridging": true,
+      "entry_height_mm": null,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 2,
+      "wheelchair_space_locations": ["designated_area"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": false,
+      "air_conditioned": true,
+      "walk_through_train": true,
+      "capacity_total": null,
+      "seats": null,
+      "length_m": null
+    },
+
+    "e2_c5": {
+      "vehicle_type_id": "e2_c5",
+      "display_name": "Type E2 + c5 (Hochflur)",
+      "mode": "tram",
+      "manufacturer": "Simmering-Graz-Pauker / Bombardier",
+      "in_service_since": 1978,
+      "status": "being_phased_out",
+      "low_floor": false,
+      "step_free_boarding": false,
+      "ramp_available": false,
+      "ramp_type": null,
+      "ramp_locations": [],
+      "ramp_automatic": false,
+      "kneeling_function": false,
+      "platform_gap_bridging": false,
+      "entry_height_mm": null,
+      "entry_requires_steps": true,
+      "wheelchair_accessible": false,
+      "wheelchair_spaces": 0,
+      "wheelchair_space_locations": [],
+      "max_wheelchair_weight_kg": null,
+      "max_wheelchair_length_mm": null,
+      "priority_seating": true,
+      "priority_seating_marked": false,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": false,
+      "air_conditioned": false,
+      "walk_through_train": false,
+      "capacity_total": null,
+      "seats": null,
+      "length_m": null
+    },
+
+    "ulf_a": {
+      "vehicle_type_id": "ulf_a",
+      "display_name": "ULF short (Type A/A1, 24m)",
+      "mode": "tram",
+      "manufacturer": "Siemens (SGP/ELIN)",
+      "in_service_since": 1995,
+      "status": "active",
+      "low_floor": true,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "folding_ramp",
+      "ramp_locations": ["first_door"],
+      "ramp_automatic": false,
+      "ramp_deployment": "driver_operated",
+      "kneeling_function": true,
+      "kneeling_height_mm": 100,
+      "platform_gap_bridging": true,
+      "entry_height_mm": 170,
+      "entry_height_lowered_mm": 100,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 1,
+      "wheelchair_space_locations": ["front_behind_driver"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": false,
+      "air_conditioned": false,
+      "air_conditioned_note": "Original A not air-conditioned; later A1 is",
+      "walk_through_train": true,
+      "capacity_total": null,
+      "seats": null,
+      "length_m": 24
+    },
+
+    "ulf_b": {
+      "vehicle_type_id": "ulf_b",
+      "display_name": "ULF long (Type B/B1, 35m)",
+      "mode": "tram",
+      "manufacturer": "Siemens (SGP/ELIN)",
+      "in_service_since": 1999,
+      "status": "active",
+      "low_floor": true,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "folding_ramp",
+      "ramp_locations": ["first_door"],
+      "ramp_automatic": false,
+      "ramp_deployment": "driver_operated",
+      "kneeling_function": true,
+      "kneeling_height_mm": 100,
+      "platform_gap_bridging": true,
+      "entry_height_mm": 170,
+      "entry_height_lowered_mm": 100,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 1,
+      "wheelchair_space_locations": ["front_behind_driver"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": false,
+      "air_conditioned": false,
+      "air_conditioned_note": "Original B not air-conditioned; later B1 is",
+      "walk_through_train": true,
+      "capacity_total": null,
+      "seats": null,
+      "length_m": 35
+    },
+
+    "flexity_d": {
+      "vehicle_type_id": "flexity_d",
+      "display_name": "Flexity Wien (Type D, 34m)",
+      "mode": "tram",
+      "manufacturer": "Alstom (Bombardier)",
+      "in_service_since": 2018,
+      "status": "active_deliveries_ongoing",
+      "low_floor": true,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "folding_ramp",
+      "ramp_locations": ["first_door"],
+      "ramp_automatic": false,
+      "ramp_deployment": "driver_operated",
+      "kneeling_function": false,
+      "platform_gap_bridging": true,
+      "entry_height_mm": 215,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 2,
+      "wheelchair_space_locations": ["multi_purpose_area_front", "multi_purpose_area_rear"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": true,
+      "interior_screen_info": ["next_stop", "transfers", "departure_times"],
+      "air_conditioned": true,
+      "walk_through_train": true,
+      "capacity_total": 211,
+      "seats": 62,
+      "length_m": 33.81
+    },
+
+    "bus_low_floor": {
+      "vehicle_type_id": "bus_low_floor",
+      "display_name": "Niederflurbus (low-floor bus)",
+      "mode": "bus",
+      "manufacturer": "various",
+      "in_service_since": null,
+      "status": "active",
+      "low_floor": true,
+      "step_free_boarding": true,
+      "ramp_available": true,
+      "ramp_type": "folding_ramp",
+      "ramp_locations": ["second_door"],
+      "ramp_automatic": false,
+      "ramp_deployment": "driver_operated",
+      "kneeling_function": true,
+      "platform_gap_bridging": true,
+      "entry_height_mm": null,
+      "wheelchair_accessible": true,
+      "wheelchair_spaces": 1,
+      "wheelchair_space_locations": ["designated_area"],
+      "max_wheelchair_weight_kg": 350,
+      "max_wheelchair_length_mm": 1000,
+      "priority_seating": true,
+      "priority_seating_marked": true,
+      "audio_announcements": true,
+      "visual_next_stop_display": true,
+      "interior_screens": "varies",
+      "air_conditioned": true,
+      "walk_through_train": false,
+      "capacity_total": null,
+      "seats": null,
+      "length_m": null
+    }
+  },
+
+
+  "line_vehicle_assignments": {
+    "_description": "Which vehicle_type_ids serve which lines. Cross-validated against wienerlinien-ogd-linien.csv (28 ptTram lines, 5 ptMetro lines, 112+ ptBusCity lines). Uses wait-factor model instead of probability.",
+    "_wait_factor_formula": "expected_wait_factor = 1.0 / fraction_accessible_vehicles. Extra wait = (expected_wait_factor - 1.0) * headway_minutes. A factor of 1.0 means every vehicle is accessible.",
+    "_fraction_notes": "fraction_accessible is estimated from fleet composition data (number of E2 sets vs total runs on a line, Silberpfeil vs V/X-Wagen ratio). Not officially published — derived from Wikipedia fleet counts and Wiener Linien press releases.",
+
+    "ubahn": {
+      "U1": {
+        "vehicle_types": ["silberpfeil_u", "v_wagen"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.70,
+        "expected_wait_factor": 1.43,
+        "notes": "Mixed Silberpfeil and V-Wagen. V-Wagen indicated by underscore on platform displays. X-Wagen expected eventually."
+      },
+      "U2": {
+        "vehicle_types": ["v_wagen", "x_wagen"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0,
+        "notes": "V-Wagen and X-Wagen only. Silberpfeil phased out from U2."
+      },
+      "U3": {
+        "vehicle_types": ["silberpfeil_u", "v_wagen", "x_wagen"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.80,
+        "expected_wait_factor": 1.25,
+        "notes": "All three types in service. X-Wagen entered U3 first (June 2023). Some Silberpfeil U2-subtype still present from Erdberg depot."
+      },
+      "U4": {
+        "vehicle_types": ["silberpfeil_u", "v_wagen"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.65,
+        "expected_wait_factor": 1.54,
+        "notes": "Mixed Silberpfeil and V-Wagen. V-Wagen indicated by underscore on platform displays."
+      },
+      "U6": {
+        "vehicle_types": ["t_t1_u6"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0,
+        "notes": "Single-type fleet. All T/T1 vehicles have fixed ramps at every door."
+      }
+    },
+
+    "tram": {
+      "_fleet_context": {
+        "total_fleet_approximate": 500,
+        "e2_in_service_late_2025": 34,
+        "ulf_total_built": 332,
+        "flexity_delivered_early_2025": 100,
+        "flexity_total_ordered": 146,
+        "overall_low_floor_service_pct": 80
+      },
+
+      "1": {
+        "vehicle_types": ["ulf_b", "flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0,
+        "notes": "Flexity since Nov 2025"
+      },
+      "2": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "5": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "6": {
+        "vehicle_types": ["flexity_d", "e2_c5"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.85,
+        "expected_wait_factor": 1.18,
+        "notes": "~4 E2 sets still in service alongside Flexity"
+      },
+      "9": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "10": {
+        "vehicle_types": ["ulf_a"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "11": {
+        "vehicle_types": ["flexity_d", "e2_c5"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.75,
+        "expected_wait_factor": 1.33,
+        "notes": "~6 E2 sets still in service alongside Flexity"
+      },
+      "18": {
+        "vehicle_types": ["flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "25": {
+        "vehicle_types": ["e2_c5", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.55,
+        "expected_wait_factor": 1.82,
+        "notes": "~4 E2 sets among ~9 total peak runs"
+      },
+      "26": {
+        "vehicle_types": ["e2_c5", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.55,
+        "expected_wait_factor": 1.82,
+        "notes": "~5 E2 sets among ~11 total peak runs"
+      },
+      "30": {
+        "vehicle_types": ["e2_c5", "ulf_a"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.50,
+        "expected_wait_factor": 2.0,
+        "notes": "~6 E2 sets among ~12 total peak runs. Highest E2 concentration."
+      },
+      "31": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "33": {
+        "vehicle_types": ["ulf_a"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "37": {
+        "vehicle_types": ["ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "38": {
+        "vehicle_types": ["ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "40": {
+        "vehicle_types": ["ulf_a"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "41": {
+        "vehicle_types": ["ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "42": {
+        "vehicle_types": ["ulf_a"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "43": {
+        "vehicle_types": ["ulf_b", "flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0,
+        "notes": "Flexity since Sep 2025"
+      },
+      "44": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "46": {
+        "vehicle_types": ["flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "49": {
+        "vehicle_types": ["flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "52": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "60": {
+        "vehicle_types": ["flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "62": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      },
+      "71": {
+        "vehicle_types": ["flexity_d", "e2_c5"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": false,
+        "fraction_accessible": 0.85,
+        "expected_wait_factor": 1.18,
+        "notes": "~4 E2 sets still in service alongside Flexity"
+      },
+      "D": {
+        "vehicle_types": ["ulf_b", "flexity_d"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0,
+        "notes": "Flexity since Apr 2025"
+      },
+      "O": {
+        "vehicle_types": ["ulf_a", "ulf_b"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      }
+    },
+
+    "bus": {
+      "_note": "All 112 ptBusCity lines use low-floor buses exclusively. Apply this default for any bus line.",
+      "default": {
+        "vehicle_types": ["bus_low_floor"],
+        "line_accessible": true,
+        "guaranteed_accessible_vehicle": true,
+        "fraction_accessible": 1.0,
+        "expected_wait_factor": 1.0
+      }
+    }
+  },
+
+
+  "general_accessibility_services": {
+    "wienmobil_app": {
+      "screen_reader_compatible": true,
+      "low_floor_vehicle_info": true,
+      "disruption_notifications": true,
+      "ticket_purchase": true,
+      "departure_times": true
+    },
+    "text_version_website": {
+      "url": "https://www.wienerlinien.at",
+      "screen_reader_optimized": true
+    },
+    "barrier_free_website": "https://www.wl-barrierefrei.at",
+    "poptis_blind_navigation": {
+      "url": "http://poptis.wl-barrierefrei.at",
+      "description": "Pre-On-Post-Trip-Information-System for blind users within U-Bahn network",
+      "language": "de"
+    },
+    "service_phone": "+43 1 7909 100",
+    "companion_free_travel": {
+      "eligible": true,
+      "condition": "Disability pass noting 'requires accompanying person' (min 70% disability)"
+    },
+    "assistance_dogs": {
+      "free_travel": true,
+      "types": ["service_dogs", "signal_dogs", "guide_dogs"],
+      "leash_muzzle_exemption": true
+    },
+    "wienmobil_hupfer": {
+      "description": "On-demand electric wheelchair-accessible minibus, bookable via app",
+      "wheelchair_accessible": true
+    },
+    "liftboy_app": {
+      "description": "Bluetooth app to call U-Bahn elevators contactlessly from ~10-15m",
+      "platforms": ["iOS_14+", "Android_9+"],
+      "works_offline": true,
+      "requires": ["bluetooth", "location_services"]
+    },
+    "elevator_realtime_api": {
+      "url": "https://www.wienerlinien.at/aufzugsinfo",
+      "scope": "Wiener Linien operated elevators only"
+    }
+  }
+}
