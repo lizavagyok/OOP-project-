@@ -13,6 +13,7 @@ class Line(AccessibleEntity):
     vehicle: Vehicle = field(default_factory=Vehicle)
     vehicles: list[Vehicle] = field(default_factory=list)
     stations: list[Station] = field(default_factory=list)
+    transport_mode: str = ""
     line_accessible: bool = True
     guaranteed_accessible_vehicle: bool = True
     expected_wait_factor: float = 1.0
@@ -34,10 +35,11 @@ class Line(AccessibleEntity):
         return unique_vehicles
 
     def is_accessible_for(self, needs: set[AccessibilityNeed]) -> bool:
+        # check if any vehicle on the line supports the needs
+        # mixed-fleet lines are still accessible, just with longer wait
         vneeds = vehicle_relevant(needs)
-        if not self.supports_all(vneeds):
-            return False
-
+        if not vneeds:
+            return True
         return any(vehicle.supports_all(vneeds) for vehicle in self.all_vehicles())
 
     def serves_station(self, station_name: str) -> bool:
