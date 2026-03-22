@@ -25,6 +25,20 @@ class Network:
     stations: dict[str, Station] = field(default_factory=dict)
     lines: list[Line] = field(default_factory=list)
 
+    def _station_needs(self, station_name: str, needs: set[AccessibilityNeed]) -> set[AccessibilityNeed]:
+        # elevator only relevant at underground stations
+        stn_needs = station_relevant(needs)
+        if AccessibilityNeed.ELEVATOR not in stn_needs:
+            return stn_needs
+        has_underground = any(
+            line.transport_mode == "ptMetro"
+            for line in self.lines
+            if line.serves_station(station_name)
+        )
+        if not has_underground:
+            stn_needs = stn_needs - {AccessibilityNeed.ELEVATOR}
+        return stn_needs
+
     def can_travel(self, passenger: Passenger) -> tuple[bool, list[str], list[RouteStep], str]:
         return self._find_route(
             passenger.start_station,
@@ -74,17 +88,25 @@ class Network:
     def report_barriers(
         self, detailed_path: list[RouteStep], needs: set[AccessibilityNeed]
     ) -> list[str]:
-        if not needs:
+        if not needs or not detailed_path:
             return []
-        stn_needs = station_relevant(needs)
         veh_needs = vehicle_relevant(needs)
         barriers: list[str] = []
         seen_stations: set[str] = set()
         seen_lines: set[str] = set()
+
+        # only check stations where passenger boards, alights, or transfers
+        last_idx = len(detailed_path) - 1
+        key_stations: set[str] = set()
+        for i, step in enumerate(detailed_path):
+            if i == 0 or i == last_idx or step.is_transfer:
+                key_stations.add(step.station_name)
+
         for step in detailed_path:
-            if step.station_name not in seen_stations:
+            if step.station_name in key_stations and step.station_name not in seen_stations:
                 seen_stations.add(step.station_name)
                 station = self.stations.get(step.station_name)
+                stn_needs = self._station_needs(step.station_name, needs)
                 if station and stn_needs:
                     missing = stn_needs - station.accessibility_traits
                     if missing:
@@ -111,10 +133,11 @@ class Network:
             return False, [], [], f"Unknown start station: {start}"
         if end not in self.stations:
             return False, [], [], f"Unknown end station: {end}"
-        stn_needs = station_relevant(required)
-        if stn_needs and not self.stations[start].supports_all(stn_needs):
+        start_needs = self._station_needs(start, required)
+        if start_needs and not self.stations[start].supports_all(start_needs):
             return False, [], [], f"Start station '{start}' does not meet passenger needs"
-        if stn_needs and not self.stations[end].supports_all(stn_needs):
+        end_needs = self._station_needs(end, required)
+        if end_needs and not self.stations[end].supports_all(end_needs):
             return False, [], [], f"End station '{end}' does not meet passenger needs"
 
         if start == end:
@@ -163,7 +186,8 @@ class Network:
                 previous[neighbor_state] = current_state
                 queue.append(neighbor_state)
 
-            if stn_needs and not self.stations[current_station].supports_all(stn_needs):
+            transfer_needs = self._station_needs(current_station, required)
+            if transfer_needs and not self.stations[current_station].supports_all(transfer_needs):
                 continue
 
             for other_line_index in station_to_line_indices.get(current_station, []):
