@@ -238,6 +238,7 @@ def load_network(
                 stations=current_line_stations,
                 vehicle=primary_vehicle,
                 vehicles=extra_vehicles,
+                transport_mode=mode,
                 accessibility_traits=line_traits,
                 line_accessible=assignment.get("line_accessible", True),
                 guaranteed_accessible_vehicle=assignment.get("guaranteed_accessible_vehicle", True),
@@ -250,6 +251,7 @@ def load_network(
                 name=line_name,
                 stations=current_line_stations,
                 vehicle=fv,
+                transport_mode=mode,
                 accessibility_traits=set(fv.accessibility_traits),
             )
 
